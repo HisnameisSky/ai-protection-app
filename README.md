@@ -29,17 +29,33 @@ AIによる無断学習、ボイスクローン、情報漏洩からクリエイ
 
 ---
 
+## 🛠️ Tech Stack / 使用技術
+UI Framework: Streamlit
+
+Image / Video Processing: Pillow, OpenCV (opencv-python-headless), NumPy
+
+Audio Processing: SciPy
+
+Security & Encryption: Cryptography (Fernet / PBKDF2HMAC), PyZipper
+
+---
+
+## 📜 License
+Distributed under the MIT License. See LICENSE for more information.
+
+---
+
 ## 🚀 Quick Start / 使い方
 
 ### Local Run (ローカル実行)
 
 ```bash
 # 1. Clone this repository
-git clone [https://github.com/YOUR_USERNAME/YOUR_REPO.name.git](https://github.com/YOUR_USERNAME/YOUR_REPO.name.git)
+git clone https://github.com/HisnameisSky/ai-protection-app.name.git)
 cd YOUR_REPO.name
 
 # 2. Install required packages
 pip install -r requirements.txt
 
 # 3. Run Streamlit App
-streamlit run app.py
+streamlit run app.py```
