@@ -5,6 +5,7 @@ import hashlib
 import base64
 import shutil
 import zipfile
+import urllib.parse
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
@@ -16,8 +17,36 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import boto3
 from botocore.config import Config
+from supabase import create_client
 
-# 全UI文字列の多言語辞書
+# 初期設定＆ページ基本構成
+st.set_page_config(
+    page_title="AI Protection Pro Studio v7.0 (Web)",
+    page_icon="🛡️",
+    layout="wide"
+)
+
+# --- Supabase 認証関数 ---
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+def verify_pro_key(user_key: str) -> bool:
+    if not user_key:
+        return False
+    # バックドア/テスト用固定キー（必要なら残す、不要なら消去OK）
+    if user_key == "PRO_STUDIO_GEN":
+        return True
+    try:
+        supabase = init_supabase()
+        response = supabase.table("license_keys").select("*").eq("key_code", user_key).eq("is_active", True).execute()
+        return len(response.data) > 0
+    except Exception:
+        return False
+
+# 多言語辞書 (I18N)
 I18N = {
     "ja": {
         "title": "🛡️ AI Protection Pro Studio v7.0 (Web)",
@@ -295,13 +324,7 @@ I18N = {
     }
 }
 
-# 初期設定＆ページ基本構成
-st.set_page_config(
-    page_title="AI Protection Pro Studio v7.0 (Web)",
-    page_icon="🛡️",
-    layout="wide"
-)
-
+# UI表示設定
 lang_choice = st.sidebar.radio("🌐 Language / 言語", ["日本語", "English"])
 lang_code = "ja" if lang_choice == "日本語" else "en"
 texts = I18N[lang_code]
@@ -316,8 +339,8 @@ st.sidebar.subheader(sb_text["pro_title"])
 
 user_key = st.sidebar.text_input(sb_text["key_label"], type="password", key="license_key")
 
-CORRECT_KEY = "PRO_STUDIO_GEN"
-is_pro = (user_key == CORRECT_KEY)
+# Supabase DBを使ってキーを判定
+is_pro = verify_pro_key(user_key)
 
 if is_pro:
     st.sidebar.success(sb_text["pro_unlocked"])
@@ -449,6 +472,26 @@ with tab_img:
                     mime="image/png"
                 )
             st.success(t["success"])
+
+            # X（Twitter）シェアボタンの動的生成
+            share_text = "🛡️『AI Protection Pro Studio』でイラストのAI学習防止＆署名処理を完了しました！\n大切な作品を守ろう✨\n"
+            share_url = "https://ai-protection-app-6ei3x86vbnp4apyjpucv2e.streamlit.app/"
+            hashtags = "AIProtectionPro,AI学習対策,イラスト保護"
+
+            encoded_text = urllib.parse.quote(share_text)
+            encoded_url = urllib.parse.quote(share_url)
+            encoded_tags = urllib.parse.quote(hashtags)
+
+            twitter_intent_url = f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}&hashtags={encoded_tags}"
+
+            st.markdown(
+                f'<a href="{twitter_intent_url}" target="_blank" style="'
+                f'display: inline-block; padding: 10px 20px; background-color: #1DA1F2; color: white; '
+                f'text-decoration: none; border-radius: 5px; font-weight: bold;">'
+                f'🩵 X（旧Twitter）で保護完了をシェアする</a>',
+                unsafe_allow_html=True
+            )
+
         else:
             st.warning(t["warn_upload"])
 
