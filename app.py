@@ -3,6 +3,8 @@ import io
 import datetime
 import hashlib
 import base64
+import shutil
+import zipfile
 import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
@@ -13,11 +15,92 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# 多言語辞書（UIおよびファイル整理用）
+
+I18N = {
+    "ja": {
+        "title": "🛡️ AI Protection Pro Studio v7.0 (Web)",
+        "subtitle": "マルチメディア資産保護・暗号化 ＆ 自動ファイル整理スイート",
+        "lang_select": "🌐 言語選択 (Language)",
+        "tabs": [
+            "🖼️ 画像保護", 
+            "🔍 透かし検証", 
+            "🔒 ZIP保護", 
+            "🎬 動画保護", 
+            "⚡ 環境監査", 
+            "📄 文書・コード保護", 
+            "🎵 音声資産保護",
+            "📁 自動ファイル整理"
+        ],
+        "sorter": {
+            "header": "📁 フォルダ自動ファイル整理 (Auto File Organizer)",
+            "desc": "指定したディレクトリ内のファイルを拡張子ごとに自動でフォルダ分けします。",
+            "target_dir": "対象ディレクトリパス",
+            "btn_organize": "🚀 ファイル自動仕分けを実行",
+            "success": "✨ すべてのファイルの仕分けが完了しました！",
+            "error_skip": "⚠️ スキップ:",
+            "download_zip": "📦 仕分け済みフォルダをZIPで一括ダウンロード",
+            "folders": {
+                ".pdf": "PDF書類",
+                ".jpg": "画像ファイル",
+                ".png": "画像ファイル",
+                ".xlsx": "エクセルデータ",
+                ".docx": "ワード書類",
+                ".zip": "圧縮ファイル",
+                ".mp4": "動画ファイル",
+                ".wav": "音声ファイル"
+            }
+        }
+    },
+    "en": {
+        "title": "🛡️ AI Protection Pro Studio v7.0 (Web)",
+        "subtitle": "Multimedia Asset Protection & File Organizer Suite",
+        "lang_select": "🌐 Language Selection",
+        "tabs": [
+            "🖼️ Image Protection", 
+            "🔍 Watermark Verify", 
+            "🔒 Secure ZIP", 
+            "🎬 Video Protection", 
+            "⚡ Environment Audit", 
+            "📄 Document/Code Vault", 
+            "🎵 Audio Asset Vault",
+            "📁 File Organizer"
+        ],
+        "sorter": {
+            "header": "📁 Automatic File Organizer",
+            "desc": "Automatically categorizes files into subfolders based on file extensions.",
+            "target_dir": "Target Directory Path",
+            "btn_organize": "🚀 Organize Files Now",
+            "success": "✨ All files have been successfully organized!",
+            "error_skip": "⚠️ Skipped:",
+            "download_zip": "📦 Download Organized Folders as ZIP",
+            "folders": {
+                ".pdf": "PDF_Documents",
+                ".jpg": "Images",
+                ".png": "Images",
+                ".xlsx": "Excel_Spreadsheets",
+                ".docx": "Word_Documents",
+                ".zip": "Archives",
+                ".mp4": "Video_Files",
+                ".wav": "Audio_Files"
+            }
+        }
+    }
+}
+
+# 初期設定＆サイドバー（言語切替）
 st.set_page_config(
     page_title="AI Protection Pro Studio v7.0 (Web)",
     page_icon="🛡️",
     layout="wide"
 )
+
+lang_choice = st.sidebar.radio("🌐 Language / 言語", ["日本語", "English"])
+lang_code = "ja" if lang_choice == "日本語" else "en"
+texts = I18N[lang_code]
+
+st.title(texts["title"])
+st.caption(texts["subtitle"])
 
 def get_fernet_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -28,18 +111,17 @@ def get_fernet_key(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode('utf-8')))
 
-st.title("🛡️ AI Protection Pro Studio v7.0")
-st.caption("マルチメディア資産保護・暗号化セキュリティスイート (Streamlit Edition)")
-
-tab_img, tab_verify, tab_zip, tab_vid, tab_audit, tab_doc, tab_audio = st.tabs([
-    "🖼️ 画像保護", 
-    "🔍 透かし検証", 
-    "🔒 ZIP保護", 
-    "🎬 動画保護", 
-    "⚡ 環境監査", 
-    "📄 文書・コード保護", 
-    "🎵 音声資産保護"
-])
+# タブ構築
+(
+    tab_img, 
+    tab_verify, 
+    tab_zip, 
+    tab_vid, 
+    tab_audit, 
+    tab_doc, 
+    tab_audio, 
+    tab_organizer
+) = st.tabs(texts["tabs"])
 
 # ==================== 1. 画像保護タブ ====================
 with tab_img:
@@ -221,7 +303,6 @@ with tab_vid:
             st.success("動画の保護処理が完了しました！")
             st.download_button("⬇️ 保護済み動画をダウンロード", vid_bytes, f"{os.path.splitext(vid_file.name)[0]}_protected.mp4", "video/mp4")
 
-            # 一時ファイルの削除
             if os.path.exists(tfile): os.remove(tfile)
             if os.path.exists(out_tfile): os.remove(out_tfile)
         else:
@@ -316,3 +397,62 @@ with tab_audio:
             st.download_button("⬇️ 保護済み音声(.wav)をダウンロード", out_buf.getvalue(), f"protected_{audio_file.name}", "audio/wav")
         else:
             st.warning(".wav ファイルを選択してください。")
+
+# ==================== 8. 自動ファイル整理タブ ====================
+with tab_organizer:
+    sorter_text = texts["sorter"]
+    st.header(sorter_text["header"])
+    st.write(sorter_text["desc"])
+
+    target_dir_input = st.text_input(
+        sorter_text["target_dir"], 
+        value="./protected_outputs", 
+        key="sorter_dir"
+    )
+
+    if st.button(sorter_text["btn_organize"], type="primary", use_container_width=True):
+        target_dir = os.path.abspath(target_dir_input)
+        
+        if os.path.exists(target_dir):
+            folders_map = sorter_text["folders"]
+            moved_count = 0
+            
+            for filename in os.listdir(target_dir):
+                file_path = os.path.join(target_dir, filename)
+                
+                if os.path.isfile(file_path):
+                    _, extension = os.path.splitext(filename)
+                    extension = extension.lower()
+                    
+                    if extension in folders_map:
+                        folder_name = folders_map[extension]
+                        dest_folder = os.path.join(target_dir, folder_name)
+                        
+                        if not os.path.exists(dest_folder):
+                            os.makedirs(dest_folder)
+                        
+                        try:
+                            shutil.move(file_path, os.path.join(dest_folder, filename))
+                            moved_count += 1
+                        except Exception as e:
+                            st.warning(f"{sorter_text['error_skip']} {filename} - {e}")
+            
+            st.success(f"{sorter_text['success']} ({moved_count} files moved)")
+
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for root, _, files in os.walk(target_dir):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, target_dir)
+                        zf.write(full_path, rel_path)
+
+            st.download_button(
+                label=sorter_text["download_zip"],
+                data=zip_buf.getvalue(),
+                file_name="organized_files.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+        else:
+            st.error(f"指定されたディレクトリが存在しません: {target_dir}")
