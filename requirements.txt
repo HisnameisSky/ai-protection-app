@@ -5,3 +5,4 @@ Pillow
 pyzipper
 opencv-python-headless
 cryptography
+boto3
