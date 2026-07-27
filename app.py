@@ -14,6 +14,8 @@ import cv2
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import boto3
+from botocore.config import Config
 
 # 多言語辞書（UIおよびファイル整理用）
 I18N = {
@@ -110,6 +112,44 @@ texts = I18N[lang_code]
 
 st.title(texts["title"])
 st.caption(texts["subtitle"])
+
+# --- Cloudflare R2 連携関数 ---
+def get_r2_client():
+    if "r2" in st.secrets:
+        r2_config = st.secrets["r2"]
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=r2_config["endpoint_url"],
+            aws_access_key_id=r2_config["aws_access_key_id"],
+            aws_secret_access_key=r2_config["aws_secret_access_key"],
+            config=Config(signature_version="s3v4"),
+            region_name="auto"
+        )
+        return s3_client, r2_config["bucket_name"]
+    return None, None
+
+def upload_to_r2(file_bytes, file_name, content_type="application/zip"):
+    try:
+        s3_client, bucket = get_r2_client()
+        if not s3_client:
+            return None
+        
+        s3_client.put_object(
+            Bucket=bucket,
+            Key=file_name,
+            Body=file_bytes,
+            ContentType=content_type
+        )
+        
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': file_name},
+            ExpiresIn=3600  # 1時間有効
+        )
+        return presigned_url
+    except Exception as e:
+        st.error(f"Cloudflare R2 アップロードエラー: {e}")
+        return None
 
 def get_fernet_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -407,7 +447,7 @@ with tab_audio:
         else:
             st.warning(".wav ファイルを選択してください。")
 
-# ==================== 8. 自動ファイル整理タブ (完全修正版) ====================
+# ==================== 8. 自動ファイル整理タブ (R2対応版) ====================
 with tab_organizer:
     sorter_text = texts["sorter"]
     st.header(sorter_text["header"])
@@ -442,10 +482,20 @@ with tab_organizer:
                         
                         zf.writestr(zip_path, file.getvalue())
 
+                zip_data = zip_buf.getvalue()
                 st.success(sorter_text["success"])
+
+                # R2へアップロードとリンク生成
+                file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                r2_url = upload_to_r2(zip_data, file_key)
+
+                if r2_url:
+                    st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
+                    st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+
                 st.download_button(
                     label=sorter_text["download_zip"],
-                    data=zip_buf.getvalue(),
+                    data=zip_data,
                     file_name="organized_files.zip",
                     mime="application/zip",
                     use_container_width=True
@@ -453,6 +503,7 @@ with tab_organizer:
             else:
                 st.warning("ファイルをアップロードしてください。")
 
+    # モード②：パス指定仕分け
     else:
         target_dir_input = st.text_input(
             sorter_text["target_dir"], 
@@ -500,9 +551,19 @@ with tab_organizer:
                             rel_path = os.path.relpath(full_path, target_dir)
                             zf.write(full_path, rel_path)
 
+                zip_data = zip_buf.getvalue()
+
+                # R2へアップロードとリンク生成
+                file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                r2_url = upload_to_r2(zip_data, file_key)
+
+                if r2_url:
+                    st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
+                    st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+
                 st.download_button(
                     label=sorter_text["download_zip"],
-                    data=zip_buf.getvalue(),
+                    data=zip_data,
                     file_name="organized_files.zip",
                     mime="application/zip",
                     use_container_width=True
