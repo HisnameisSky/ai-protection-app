@@ -1,6 +1,6 @@
 # 🛜アクセスリンク先（Access Link below）：
-https://ai-protection-app-6ei3x86vbnp4apyjpucv2e.streamlit.app/
-
+[https://ai-protection-studio.streamlit.app/
+](https://ai-protection-studio.streamlit.app/)
 # 🛡️ AI Protection Pro Studio v7.0 (Web Edition)
 
 An all-in-one web application designed to protect digital assets—images, videos, audio, and documents—from unauthorized AI training, voice cloning, and data leakage.
