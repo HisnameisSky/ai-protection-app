@@ -16,7 +16,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # 多言語辞書（UIおよびファイル整理用）
-
 I18N = {
     "ja": {
         "title": "🛡️ AI Protection Pro Studio v7.0 (Web)",
@@ -34,10 +33,15 @@ I18N = {
         ],
         "sorter": {
             "header": "📁 フォルダ自動ファイル整理 (Auto File Organizer)",
-            "desc": "指定したディレクトリ内のファイルを拡張子ごとに自動でフォルダ分けします。",
+            "desc": "ファイルをドラッグ＆ドロップするか、ディレクトリを指定して自動仕分けを行います。",
+            "mode_select": "整理モードの選択",
+            "mode_upload": "📤 ファイル直接アップロード仕分け (Web推奨)",
+            "mode_path": "📂 サーバー/ローカルパス指定仕分け",
+            "upload_label": "仕分けたいファイルをまとめて選択",
             "target_dir": "対象ディレクトリパス",
             "btn_organize": "🚀 ファイル自動仕分けを実行",
             "success": "✨ すべてのファイルの仕分けが完了しました！",
+            "empty": "💡 対象のフォルダに仕分け可能なファイルがありません。",
             "error_skip": "⚠️ スキップ:",
             "download_zip": "📦 仕分け済みフォルダをZIPで一括ダウンロード",
             "folders": {
@@ -68,10 +72,15 @@ I18N = {
         ],
         "sorter": {
             "header": "📁 Automatic File Organizer",
-            "desc": "Automatically categorizes files into subfolders based on file extensions.",
+            "desc": "Upload files directly or specify a directory path to categorize them automatically.",
+            "mode_select": "Select Mode",
+            "mode_upload": "📤 Upload Files Directly (Recommended for Web)",
+            "mode_path": "📂 Specify Server/Local Path",
+            "upload_label": "Select multiple files to organize",
             "target_dir": "Target Directory Path",
             "btn_organize": "🚀 Organize Files Now",
             "success": "✨ All files have been successfully organized!",
+            "empty": "💡 No processable files found in the target directory.",
             "error_skip": "⚠️ Skipped:",
             "download_zip": "📦 Download Organized Folders as ZIP",
             "folders": {
@@ -398,26 +407,69 @@ with tab_audio:
         else:
             st.warning(".wav ファイルを選択してください。")
 
-# ==================== 8. 自動ファイル整理タブ ====================
+# ==================== 8. 自動ファイル整理タブ (完全修正版) ====================
 with tab_organizer:
     sorter_text = texts["sorter"]
     st.header(sorter_text["header"])
     st.write(sorter_text["desc"])
 
-    target_dir_input = st.text_input(
-        sorter_text["target_dir"], 
-        value="./protected_outputs", 
-        key="sorter_dir"
+    mode = st.radio(
+        sorter_text["mode_select"], 
+        [sorter_text["mode_upload"], sorter_text["mode_path"]],
+        key="sorter_mode"
     )
 
-    if st.button(sorter_text["btn_organize"], type="primary", use_container_width=True):
-        target_dir = os.path.abspath(target_dir_input)
-        
-        if os.path.exists(target_dir):
-            folders_map = sorter_text["folders"]
-            moved_count = 0
+    folders_map = sorter_text["folders"]
+
+    # モード①：直接ファイルをアップロードして仕分け（Web版推奨）
+    if mode == sorter_text["mode_upload"]:
+        uploaded_files = st.file_uploader(
+            sorter_text["upload_label"], 
+            accept_multiple_files=True, 
+            key="sorter_uploader"
+        )
+
+        if st.button(sorter_text["btn_organize"], type="primary", use_container_width=True):
+            if uploaded_files:
+                zip_buf = io.BytesIO()
+                with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for file in uploaded_files:
+                        _, extension = os.path.splitext(file.name)
+                        extension = extension.lower()
+                        
+                        folder_name = folders_map.get(extension, "Other_Files")
+                        zip_path = f"{folder_name}/{file.name}"
+                        
+                        zf.writestr(zip_path, file.getvalue())
+
+                st.success(sorter_text["success"])
+                st.download_button(
+                    label=sorter_text["download_zip"],
+                    data=zip_buf.getvalue(),
+                    file_name="organized_files.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
+            else:
+                st.warning("ファイルをアップロードしてください。")
+
+    else:
+        target_dir_input = st.text_input(
+            sorter_text["target_dir"], 
+            value="./protected_outputs", 
+            key="sorter_dir"
+        )
+
+        if st.button(sorter_text["btn_organize"], type="primary", use_container_width=True):
+            target_dir = os.path.abspath(target_dir_input)
             
-            for filename in os.listdir(target_dir):
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir, exist_ok=True)
+
+            moved_count = 0
+            file_list = os.listdir(target_dir)
+
+            for filename in file_list:
                 file_path = os.path.join(target_dir, filename)
                 
                 if os.path.isfile(file_path):
@@ -429,30 +481,31 @@ with tab_organizer:
                         dest_folder = os.path.join(target_dir, folder_name)
                         
                         if not os.path.exists(dest_folder):
-                            os.makedirs(dest_folder)
+                            os.makedirs(dest_folder, exist_ok=True)
                         
                         try:
                             shutil.move(file_path, os.path.join(dest_folder, filename))
                             moved_count += 1
                         except Exception as e:
                             st.warning(f"{sorter_text['error_skip']} {filename} - {e}")
-            
-            st.success(f"{sorter_text['success']} ({moved_count} files moved)")
 
-            zip_buf = io.BytesIO()
-            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for root, _, files in os.walk(target_dir):
-                    for file in files:
-                        full_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(full_path, target_dir)
-                        zf.write(full_path, rel_path)
+            if moved_count > 0:
+                st.success(f"{sorter_text['success']} ({moved_count} files moved)")
 
-            st.download_button(
-                label=sorter_text["download_zip"],
-                data=zip_buf.getvalue(),
-                file_name="organized_files.zip",
-                mime="application/zip",
-                use_container_width=True
-            )
-        else:
-            st.error(f"指定されたディレクトリが存在しません: {target_dir}")
+                zip_buf = io.BytesIO()
+                with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for root, _, files in os.walk(target_dir):
+                        for file in files:
+                            full_path = os.path.join(root, file)
+                            rel_path = os.path.relpath(full_path, target_dir)
+                            zf.write(full_path, rel_path)
+
+                st.download_button(
+                    label=sorter_text["download_zip"],
+                    data=zip_buf.getvalue(),
+                    file_name="organized_files.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
+            else:
+                st.info(sorter_text["empty"])
