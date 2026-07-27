@@ -99,7 +99,7 @@ I18N = {
     }
 }
 
-# 初期設定＆サイドバー（言語切替）
+# 初期設定＆サイドバー（言語切替・認証）
 st.set_page_config(
     page_title="AI Protection Pro Studio v7.0 (Web)",
     page_icon="🛡️",
@@ -112,6 +112,28 @@ texts = I18N[lang_code]
 
 st.title(texts["title"])
 st.caption(texts["subtitle"])
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔑 Pro Plan Unlock (有料版)")
+
+user_key = st.sidebar.text_input("アクセスキーを入力", type="password", key="license_key")
+
+CORRECT_KEY = "PRO_STUDIO_GEN"
+is_pro = (user_key == CORRECT_KEY)
+
+if is_pro:
+    st.sidebar.success("🔓 Pro機能が解放されました！")
+else:
+    st.sidebar.warning("🔒 現在は無料版モードです")
+    st.sidebar.markdown("""
+    **【Pro版の特典】**
+    * 🎬 全フレーム動画保護機能
+    * 🎵 19kHz帯域 音声資産保護
+    * ☁️ Cloudflare R2 クラウド保存
+    
+    👉 **[PayPalでPro版キーを購入する](https://paypal.me/HisnameisSky0/5USD)**  
+    *(※決済完了画面に表示されるキーを入力してください)*
+    """)
 
 # --- Cloudflare R2 連携関数 ---
 def get_r2_client():
@@ -291,71 +313,76 @@ with tab_zip:
         else:
             st.warning("ファイルとパスワードの両方を入力してください。")
 
-# ==================== 4. 動画保護タブ ====================
+# ==================== 4. 動画保護タブ (Pro限定) ====================
 with tab_vid:
     st.header("AI Anti-Learning Video Protection")
-    st.write("動画の全フレームにAI学習防止ノイズを付与します。")
+    
+    if not is_pro:
+        st.error("🔒 この機能は Pro プラン限定です。")
+        st.info("サイドバーから PayPal で決済し、アクセスキーを入力するとロックが解除されます。")
+    else:
+        st.write("動画の全フレームにAI学習防止ノイズを付与します。")
 
-    vid_file = st.file_uploader("動画ファイルを選択 (.mp4)", type=["mp4"], key="vid_uploader")
-    col_vid1, col_vid2 = st.columns(2)
-    with col_vid1:
-        v_pattern = st.selectbox("動画用パターン", ["Grid (格子模様)", "Slash (斜め線)", "Checker (市松模様)"], key="v_pat")
-    with col_vid2:
-        v_intensity = st.slider("ノイズ強度 (推奨: 4.0〜6.0)", 2.0, 15.0, 5.0, step=0.5, key="v_int")
+        vid_file = st.file_uploader("動画ファイルを選択 (.mp4)", type=["mp4"], key="vid_uploader")
+        col_vid1, col_vid2 = st.columns(2)
+        with col_vid1:
+            v_pattern = st.selectbox("動画用パターン", ["Grid (格子模様)", "Slash (斜め線)", "Checker (市松模様)"], key="v_pat")
+        with col_vid2:
+            v_intensity = st.slider("ノイズ強度 (推奨: 4.0〜6.0)", 2.0, 15.0, 5.0, step=0.5, key="v_int")
 
-    if st.button("🎬 全フレーム保護動画を書き出す", type="primary", use_container_width=True):
-        if vid_file:
-            tfile = f"temp_input_{datetime.datetime.now().timestamp()}.mp4"
-            out_tfile = f"temp_output_{datetime.datetime.now().timestamp()}.mp4"
-            
-            with open(tfile, "wb") as f:
-                f.write(vid_file.read())
-
-            cap = cv2.VideoCapture(tfile)
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(out_tfile, fourcc, fps, (width, height))
-
-            X, Y = np.meshgrid(np.arange(width), np.arange(height))
-            if "Slash" in v_pattern: perturbation = np.sin((X + Y) / 2.0) * v_intensity
-            elif "Checker" in v_pattern: perturbation = (np.sin(X / 2.0) * np.sin(Y / 2.0)) * v_intensity
-            else: perturbation = (np.sin(X / 2.0) * np.cos(Y / 2.0)) * v_intensity
-
-            np.random.seed(1337)
-            random_noise = np.random.normal(0, v_intensity * 0.3, (height, width, 3))
-
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            frame_count = 0
-
-            while True:
-                ret, frame = cap.read()
-                if not ret: break
-                frame_float = frame.astype(np.float32)
-                for i in range(3): frame_float[:, :, i] += perturbation + random_noise[:, :, i]
-                out.write(np.clip(frame_float, 0, 255).astype(np.uint8))
+        if st.button("🎬 全フレーム保護動画を書き出す", type="primary", use_container_width=True):
+            if vid_file:
+                tfile = f"temp_input_{datetime.datetime.now().timestamp()}.mp4"
+                out_tfile = f"temp_output_{datetime.datetime.now().timestamp()}.mp4"
                 
-                frame_count += 1
-                progress_bar.progress(min(frame_count / total_frames, 1.0))
-                status_text.text(f"フレーム処理中... ({frame_count}/{total_frames})")
+                with open(tfile, "wb") as f:
+                    f.write(vid_file.read())
 
-            cap.release()
-            out.release()
+                cap = cv2.VideoCapture(tfile)
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            with open(out_tfile, "rb") as f:
-                vid_bytes = f.read()
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out = cv2.VideoWriter(out_tfile, fourcc, fps, (width, height))
 
-            st.success("動画の保護処理が完了しました！")
-            st.download_button("⬇️ 保護済み動画をダウンロード", vid_bytes, f"{os.path.splitext(vid_file.name)[0]}_protected.mp4", "video/mp4")
+                X, Y = np.meshgrid(np.arange(width), np.arange(height))
+                if "Slash" in v_pattern: perturbation = np.sin((X + Y) / 2.0) * v_intensity
+                elif "Checker" in v_pattern: perturbation = (np.sin(X / 2.0) * np.sin(Y / 2.0)) * v_intensity
+                else: perturbation = (np.sin(X / 2.0) * np.cos(Y / 2.0)) * v_intensity
 
-            if os.path.exists(tfile): os.remove(tfile)
-            if os.path.exists(out_tfile): os.remove(out_tfile)
-        else:
-            st.warning("動画ファイルをアップロードしてください。")
+                np.random.seed(1337)
+                random_noise = np.random.normal(0, v_intensity * 0.3, (height, width, 3))
+
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                frame_count = 0
+
+                while True:
+                    ret, frame = cap.read()
+                    if not ret: break
+                    frame_float = frame.astype(np.float32)
+                    for i in range(3): frame_float[:, :, i] += perturbation + random_noise[:, :, i]
+                    out.write(np.clip(frame_float, 0, 255).astype(np.uint8))
+                    
+                    frame_count += 1
+                    progress_bar.progress(min(frame_count / total_frames, 1.0))
+                    status_text.text(f"フレーム処理中... ({frame_count}/{total_frames})")
+
+                cap.release()
+                out.release()
+
+                with open(out_tfile, "rb") as f:
+                    vid_bytes = f.read()
+
+                st.success("動画の保護処理が完了しました！")
+                st.download_button("⬇️ 保護済み動画をダウンロード", vid_bytes, f"{os.path.splitext(vid_file.name)[0]}_protected.mp4", "video/mp4")
+
+                if os.path.exists(tfile): os.remove(tfile)
+                if os.path.exists(out_tfile): os.remove(out_tfile)
+            else:
+                st.warning("動画ファイルをアップロードしてください。")
 
 # ==================== 5. 環境監査タブ ====================
 with tab_audit:
@@ -414,40 +441,45 @@ with tab_doc:
             else:
                 st.warning("ファイルとパスワードを指定してください。")
 
-# ==================== 7. 音声資産保護タブ ====================
+# ==================== 7. 音声資産保護タブ (Pro限定) ====================
 with tab_audio:
     st.header("Audio Vault (19kHz Anti-AI)")
-    st.write("不可聴領域(19kHz帯域)に暗号シードに基づくパターンを付与し、ボイスクローン等を防ぎます。")
+    
+    if not is_pro:
+        st.error("🔒 この機能は Pro プラン限定です。")
+        st.info("サイドバーから PayPal で決済し、アクセスキーを入力するとロックが解除されます。")
+    else:
+        st.write("不可聴領域(19kHz帯域)に暗号シードに基づくパターンを付与し、ボイスクローン等を防ぎます。")
 
-    audio_file = st.file_uploader("音声ファイルを選択 (.wav)", type=["wav"], key="audio_uploader")
-    secret_key = st.text_input("所有者識別キー (暗号シード)", "Studio7_User_Key")
+        audio_file = st.file_uploader("音声ファイルを選択 (.wav)", type=["wav"], key="audio_uploader")
+        secret_key = st.text_input("所有者識別キー (暗号シード)", "Studio7_User_Key")
 
-    if st.button("🎵 音声資産の保護を実行", type="primary", use_container_width=True):
-        if audio_file:
-            sample_rate, data = wavfile.read(io.BytesIO(audio_file.getvalue()))
-            
-            np.random.seed(sum(ord(c) for c in secret_key))
-            time_axis = np.linspace(0, len(data) / sample_rate, len(data), endpoint=False)
-            watermark = (np.sin(2 * np.pi * 19000 * time_axis) + np.random.normal(0, 1, len(data)) * 0.1) * 0.003
+        if st.button("🎵 音声資産の保護を実行", type="primary", use_container_width=True):
+            if audio_file:
+                sample_rate, data = wavfile.read(io.BytesIO(audio_file.getvalue()))
+                
+                np.random.seed(sum(ord(c) for c in secret_key))
+                time_axis = np.linspace(0, len(data) / sample_rate, len(data), endpoint=False)
+                watermark = (np.sin(2 * np.pi * 19000 * time_axis) + np.random.normal(0, 1, len(data)) * 0.1) * 0.003
 
-            protected_data = data.copy().astype(np.float32)
-            if len(protected_data.shape) > 1:
-                for ch in range(protected_data.shape[1]):
-                    protected_data[:, ch] += watermark * (np.max(np.abs(data[:, ch])) or 1)
+                protected_data = data.copy().astype(np.float32)
+                if len(protected_data.shape) > 1:
+                    for ch in range(protected_data.shape[1]):
+                        protected_data[:, ch] += watermark * (np.max(np.abs(data[:, ch])) or 1)
+                else:
+                    protected_data += watermark * (np.max(np.abs(data)) or 1)
+
+                final_data = np.clip(protected_data, -32768, 32767).astype(np.int16) if data.dtype == np.int16 else protected_data
+                
+                out_buf = io.BytesIO()
+                wavfile.write(out_buf, sample_rate, final_data)
+
+                st.success("音声ファイルの保護処理が完了しました！")
+                st.download_button("⬇️ 保護済み音声(.wav)をダウンロード", out_buf.getvalue(), f"protected_{audio_file.name}", "audio/wav")
             else:
-                protected_data += watermark * (np.max(np.abs(data)) or 1)
+                st.warning(".wav ファイルを選択してください。")
 
-            final_data = np.clip(protected_data, -32768, 32767).astype(np.int16) if data.dtype == np.int16 else protected_data
-            
-            out_buf = io.BytesIO()
-            wavfile.write(out_buf, sample_rate, final_data)
-
-            st.success("音声ファイルの保護処理が完了しました！")
-            st.download_button("⬇️ 保護済み音声(.wav)をダウンロード", out_buf.getvalue(), f"protected_{audio_file.name}", "audio/wav")
-        else:
-            st.warning(".wav ファイルを選択してください。")
-
-# ==================== 8. 自動ファイル整理タブ (R2対応版) ====================
+# ==================== 8. 自動ファイル整理タブ ====================
 with tab_organizer:
     sorter_text = texts["sorter"]
     st.header(sorter_text["header"])
@@ -461,7 +493,7 @@ with tab_organizer:
 
     folders_map = sorter_text["folders"]
 
-    # モード①：直接ファイルをアップロードして仕分け（Web版推奨）
+    # モード①：直接ファイルをアップロードして仕分け
     if mode == sorter_text["mode_upload"]:
         uploaded_files = st.file_uploader(
             sorter_text["upload_label"], 
@@ -485,14 +517,18 @@ with tab_organizer:
                 zip_data = zip_buf.getvalue()
                 st.success(sorter_text["success"])
 
-                # R2へアップロードとリンク生成
-                file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-                r2_url = upload_to_r2(zip_data, file_key)
+                # R2への自動保存（Pro機能限定分岐）
+                if is_pro:
+                    file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                    r2_url = upload_to_r2(zip_data, file_key)
 
-                if r2_url:
-                    st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
-                    st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+                    if r2_url:
+                        st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
+                        st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+                else:
+                    st.warning("🔒 Cloudflare R2 クラウドへの自動保存機能は Pro プラン限定です。（通常ZIPダウンロードは利用可能です）")
 
+                # 無料版・Pro版共通でローカル直接ダウンロードは提供
                 st.download_button(
                     label=sorter_text["download_zip"],
                     data=zip_data,
@@ -553,13 +589,16 @@ with tab_organizer:
 
                 zip_data = zip_buf.getvalue()
 
-                # R2へアップロードとリンク生成
-                file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-                r2_url = upload_to_r2(zip_data, file_key)
+                # R2への自動保存（Pro機能限定分岐）
+                if is_pro:
+                    file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                    r2_url = upload_to_r2(zip_data, file_key)
 
-                if r2_url:
-                    st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
-                    st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+                    if r2_url:
+                        st.info("☁️ Cloudflare R2 クラウドストレージに安全に保存されました！")
+                        st.markdown(f"🔗 **[クラウドから一括ダウンロード（有効期限: 1時間）]({r2_url})**")
+                else:
+                    st.warning("🔒 Cloudflare R2 クラウドへの自動保存機能は Pro プラン限定です。")
 
                 st.download_button(
                     label=sorter_text["download_zip"],
