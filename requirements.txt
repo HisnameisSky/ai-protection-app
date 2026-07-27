@@ -6,3 +6,4 @@ pyzipper
 opencv-python-headless
 cryptography
 boto3
+supabase
