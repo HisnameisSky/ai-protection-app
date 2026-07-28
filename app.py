@@ -26,7 +26,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Supabase 認証関数 ---
+# --- Supabase 認証・データ送信関数 ---
 @st.cache_resource
 def init_supabase():
     url = st.secrets["SUPABASE_URL"]
@@ -43,6 +43,22 @@ def verify_pro_key(user_key: str) -> bool:
         return len(response.data) > 0
     except Exception as e:
         st.sidebar.error(f"Supabaseエラー: {e}")
+        return False
+
+def send_feedback(category: str, content: str, email: str = "") -> bool:
+    """Supabaseの 'feedbacks' テーブルに投稿を保存"""
+    try:
+        supabase = init_supabase()
+        data = {
+            "category": category,
+            "content": content,
+            "email": email if email else None,
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+        supabase.table("feedbacks").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Feedback Send Error: {e}")
         return False
 
 # 多言語辞書 (I18N)
@@ -73,7 +89,8 @@ I18N = {
             "⚡ 環境監査", 
             "📄 文書・コード保護", 
             "🎵 音声資産保護",
-            "📁 自動ファイル整理"
+            "📁 自動ファイル整理",
+            "💬 フィードバック"
         ],
         "img_tab": {
             "header": "AI Protection & Signature Pro",
@@ -182,6 +199,19 @@ I18N = {
                 ".mp4": "動画ファイル",
                 ".wav": "音声ファイル"
             }
+        },
+        "feedback_tab": {
+            "header": "💬 ご意見・改善提案 (Feedback & Requests)",
+            "desc": "サービスの改善や新機能の要望、バグ報告などをぜひお寄せください。",
+            "type_label": "お問い合わせ種別",
+            "type_options": ["💡 機能の改善提案", "🐛 バグ・不具合報告", "✨ 新機能のリクエスト", "💬 その他"],
+            "content_label": "メッセージ内容 (具体的に記載いただけますと幸いです)",
+            "content_placeholder": "例: 〇〇の処理速度をもう少し上げてほしい、〇〇のファイル拡張子にも対応してほしい、など",
+            "email_label": "返信先メールアドレス (任意)",
+            "email_placeholder": "name@example.com",
+            "btn_submit": "✉️ フィードバックを送信",
+            "success": "🎉 フィードバックをお送りいただきありがとうございます！今後の開発の参考にさせていただきます。",
+            "warn_empty": "⚠️ メッセージ内容を入力してください。"
         }
     },
     "en": {
@@ -210,7 +240,8 @@ I18N = {
             "⚡ Environment Audit", 
             "📄 Document/Code Vault", 
             "🎵 Audio Asset Vault",
-            "📁 File Organizer"
+            "📁 File Organizer",
+            "💬 Feedback"
         ],
         "img_tab": {
             "header": "AI Protection & Signature Pro",
@@ -319,6 +350,19 @@ I18N = {
                 ".mp4": "Video_Files",
                 ".wav": "Audio_Files"
             }
+        },
+        "feedback_tab": {
+            "header": "💬 Feedback & Improvement Suggestions",
+            "desc": "We welcome your suggestions for improvement, feature requests, and bug reports.",
+            "type_label": "Category",
+            "type_options": ["💡 Improvement Suggestion", "🐛 Bug Report", "✨ Feature Request", "💬 Other"],
+            "content_label": "Message Content (Detailed feedback appreciated)",
+            "content_placeholder": "E.g. Please optimize processing speed for large files...",
+            "email_label": "Your Email (Optional)",
+            "email_placeholder": "name@example.com",
+            "btn_submit": "✉️ Send Feedback",
+            "success": "🎉 Thank you for your feedback! It helps us improve the service.",
+            "warn_empty": "⚠️ Please enter your message."
         }
     }
 }
@@ -398,7 +442,7 @@ def get_fernet_key(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode('utf-8')))
 
-# タブ生成
+# タブ生成（9つのタブ）
 (
     tab_img, 
     tab_verify, 
@@ -407,7 +451,8 @@ def get_fernet_key(password: str, salt: bytes) -> bytes:
     tab_audit, 
     tab_doc, 
     tab_audio, 
-    tab_organizer
+    tab_organizer,
+    tab_feedback
 ) = st.tabs(texts["tabs"])
 
 # ==================== 1. 画像保護タブ ====================
@@ -472,7 +517,7 @@ with tab_img:
                 )
             st.success(t["success"])
 
-            # X（Twitter）シェアボタンの動的生成（実体URLに統一）
+            # X（Twitter）シェアボタンの動的生成
             share_text = "🛡️『AI Protection Pro Studio』でイラストのAI学習防止＆署名処理を完了しました！\n大切な作品を守ろう✨\n"
             share_url = "https://ai-protection-studio.streamlit.app/"
             hashtags = "AIProtectionPro,AI学習対策,イラスト保護"
@@ -760,7 +805,6 @@ with tab_organizer:
                 zip_data = zip_buf.getvalue()
                 st.success(sorter_text["success"])
 
-                # R2への自動保存（Pro機能限定分岐）
                 if is_pro:
                     file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
                     r2_url = upload_to_r2(zip_data, file_key)
@@ -831,7 +875,6 @@ with tab_organizer:
 
                 zip_data = zip_buf.getvalue()
 
-                # R2への自動保存（Pro機能限定分岐）
                 if is_pro:
                     file_key = f"organized_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
                     r2_url = upload_to_r2(zip_data, file_key)
@@ -851,3 +894,21 @@ with tab_organizer:
                 )
             else:
                 st.info(sorter_text["empty"])
+
+# ==================== 9. フィードバックタブ ====================
+with tab_feedback:
+    fb_text = texts["feedback_tab"]
+    st.header(fb_text["header"])
+    st.write(fb_text["desc"])
+
+    fb_category = st.selectbox(fb_text["type_label"], fb_text["type_options"], key="fb_category")
+    fb_content = st.text_area(fb_text["content_label"], placeholder=fb_text["content_placeholder"], height=150, key="fb_content")
+    fb_email = st.text_input(fb_text["email_label"], placeholder=fb_text["email_placeholder"], key="fb_email")
+
+    if st.button(fb_text["btn_submit"], type="primary", use_container_width=True):
+        if fb_content.strip():
+            with st.spinner("Sending..."):
+                if send_feedback(fb_category, fb_content, fb_email):
+                    st.success(fb_text["success"])
+        else:
+            st.warning(fb_text["warn_empty"])
