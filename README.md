@@ -1,3 +1,5 @@
+<img width="1477" height="759" alt="スクリーンショット 2026-07-28 16 54 56" src="https://github.com/user-attachments/assets/7f2d9aa7-b7da-4886-8cff-86656649deb5" />
+
 # 🛜アクセスリンク先（Access Link below）：
 [https://ai-protection-studio.streamlit.app/
 ](https://ai-protection-studio.streamlit.app/)
