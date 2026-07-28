@@ -40,8 +40,13 @@ def verify_pro_key(user_key: str) -> bool:
     try:
         supabase = init_supabase()
         response = supabase.table("license_keys").select("*").eq("key_code", user_key).eq("is_active", True).execute()
+        
+        # 画面に検索結果の件数を出す（デバッグ用）
+        # st.sidebar.write(f"取得件数: {len(response.data)}")
+        
         return len(response.data) > 0
-    except Exception:
+    except Exception as e:
+        st.sidebar.error(f"Supabaseエラー: {e}")
         return False
 
 # 多言語辞書 (I18N)
