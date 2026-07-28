@@ -36,14 +36,10 @@ def init_supabase():
 def verify_pro_key(user_key: str) -> bool:
     if not user_key:
         return False
-    
+
     try:
         supabase = init_supabase()
         response = supabase.table("license_keys").select("*").eq("key_code", user_key).eq("is_active", True).execute()
-        
-        # 画面に検索結果の件数を出す（デバッグ用）
-        # st.sidebar.write(f"取得件数: {len(response.data)}")
-        
         return len(response.data) > 0
     except Exception as e:
         st.sidebar.error(f"Supabaseエラー: {e}")
@@ -476,9 +472,9 @@ with tab_img:
                 )
             st.success(t["success"])
 
-            # X（Twitter）シェアボタンの動的生成
+            # X（Twitter）シェアボタンの動的生成（実体URLに統一）
             share_text = "🛡️『AI Protection Pro Studio』でイラストのAI学習防止＆署名処理を完了しました！\n大切な作品を守ろう✨\n"
-            share_url = "https://ai-protection-app-6ei3x86vbnp4apyjpucv2e.streamlit.app/"
+            share_url = "https://ai-protection-studio.streamlit.app/"
             hashtags = "AIProtectionPro,AI学習対策,イラスト保護"
 
             encoded_text = urllib.parse.quote(share_text)
@@ -611,7 +607,7 @@ with tab_vid:
                     out.write(np.clip(frame_float, 0, 255).astype(np.uint8))
                     
                     frame_count += 1
-                    progress_bar.progress(min(frame_count / total_frames, 1.0))
+                    progress_bar.progress(min(frame_count / max(total_frames, 1), 1.0))
                     status_text.text(f"Processing... ({frame_count}/{total_frames})")
 
                 cap.release()
