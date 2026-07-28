@@ -36,9 +36,7 @@ def init_supabase():
 def verify_pro_key(user_key: str) -> bool:
     if not user_key:
         return False
-    # バックドア/テスト用固定キー（必要なら残す、不要なら消去OK）
-    if user_key == "PRO_STUDIO_GEN":
-        return True
+    
     try:
         supabase = init_supabase()
         response = supabase.table("license_keys").select("*").eq("key_code", user_key).eq("is_active", True).execute()
