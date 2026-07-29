@@ -54,10 +54,17 @@ Distributed under the MIT License. See LICENSE for more information.
 ```bash
 # 1. Clone this repository
 git clone https://github.com/HisnameisSky/ai-protection-app.name.git)
-cd YOUR_REPO.name
+cd ai-protection-app.name
 
 # 2. Install required packages
 pip install -r requirements.txt
 
 # 3. Run Streamlit App
-streamlit run app.py```
+streamlit run app.py
+```
+---
+
+### デスクトップ版アプリなら：
+### For desktop-app version:
+https://github.com/HisnameisSky/ai-protection-pro-v7
+
