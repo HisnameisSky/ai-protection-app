@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import boto3
 from botocore.config import Config
+import resend
 from supabase import create_client
 
 # 初期設定＆ページ基本構成
@@ -46,7 +47,7 @@ def verify_pro_key(user_key: str) -> bool:
         return False
 
 def send_feedback(category: str, content: str, email: str = "") -> bool:
-    """Supabaseの 'feedbacks' テーブルに投稿を保存"""
+
     try:
         supabase = init_supabase()
         data = {
@@ -56,7 +57,24 @@ def send_feedback(category: str, content: str, email: str = "") -> bool:
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         supabase.table("feedbacks").insert(data).execute()
+
+        if "RESEND_API_KEY" in st.secrets:
+            resend.api_key = st.secrets["RESEND_API_KEY"]
+            admin_email = st.secrets.get("ADMIN_EMAIL", "hisnameissky+a@gmail.com")
+
+            resend.Emails.send({
+                "from": "onboarding@resend.dev",  # テスト時はこのまま固定
+                "to": admin_email,
+                "subject": f"💬【Feedback】{category}",
+                "html": f"""
+                    <h3>新しいフィードバックが届きました</h3>
+                    <p><strong>カテゴリ:</strong> {category}</p>
+                    <p><strong>内容:</strong><br>{content.replace(chr(10), '<br>')}</p>
+                    <p><strong>ユーザー返信先:</strong> {email if email else '未入力'}</p>
+                """
+            })
         return True
+
     except Exception as e:
         st.error(f"Feedback Send Error: {e}")
         return False
