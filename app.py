@@ -526,8 +526,7 @@ with tab_img:
                 final_img.save(buf, format="PNG")
                 byte_im = buf.getvalue()
 
-                st.image(final_img, caption=f"Protected: {uploaded_file.name}", use_column_width=True)
-                st.download_button(
+                st.image(final_img, caption=f"Protected: {uploaded_file.name}", use_container_width=True)                st.download_button(
                     label=t["dl_btn"].format(uploaded_file.name),
                     data=byte_im,
                     file_name=f"{os.path.splitext(uploaded_file.name)[0]}_protected.png",
@@ -585,8 +584,7 @@ with tab_verify:
                 buf = io.BytesIO()
                 diff_image.save(buf, format="PNG")
                 
-                st.image(diff_image, caption=t["caption"], use_column_width=True)
-                st.download_button(t["dl_btn"], buf.getvalue(), "watermark_verified_diff.png", "image/png")
+                st.image(diff_image, caption=t["caption"], use_container_width=True)                st.download_button(t["dl_btn"], buf.getvalue(), "watermark_verified_diff.png", "image/png")
                 st.success(t["success"])
             except Exception as e:
                 st.error(f"Error: {e}")
