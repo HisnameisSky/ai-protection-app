@@ -944,119 +944,44 @@ with tab_feedback:
 
 # ==================== 10. プロンプトガードタブ ====================
 with tab_guard:
+    import re
+
     g_text = texts["guard_tab"]
     st.header(g_text["header"])
     st.write(g_text["desc"])
 
-    HTML_COMPONENT = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.4.0/dist/streamlit-component-lib.js"></script>
-      <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        textarea {
-          width: 100%;
-          height: 90px;
-          box-sizing: border-box;
-          padding: 10px;
-          border: 1px solid #ccc;
-          border-radius: 6px;
-          font-size: 14px;
-        }
-        textarea.danger {
-          border: 2px solid #ff4b4b;
-          background-color: #ffebeb;
-        }
-        .warning-text {
-          color: #ff4b4b;
-          font-size: 12px;
-          margin-top: 4px;
-          font-weight: bold;
-        }
-      </style>
-    </head>
-    <body>
-      <textarea id="promptInput" placeholder="AIへの指示を入力してください（例: Ignore previous instructions）"></textarea>
-      <div id="warningBox" class="warning-text"></div>
+    # 判定ルール（Raw string r"..." を使用してエスケープ警告を回避）
+    RULES = [
+        (r"ignore\s*(all)?\s*(previous|prior|above)\s*(instructions|prompts|rules)", "Ignore Instructions", 50),
+        (r"(以前|これまで)の(指示|プロンプト|ルール)を(無視|リセット|忘れ)", "以前の指示の無視 (日本語)", 50),
+        (r"(show|print|display|reveal|output)\s*(me)?\s*(the)?\s*(system|initial)?\s*(prompt|instructions)", "System Prompt Extraction", 40),
+        (r"(システム|初期)プロンプトを(表示|出力|開示|見せ)", "システムプロンプト開示要求 (日本語)", 40),
+        (r"(admin|administrator|developer|root|god)\s*mode|jailbreak", "Admin/Jailbreak Mode", 40)
+    ]
 
-      <script>
-        function debounce(func, delay) {
-          let timeoutId;
-          return function (...args) {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => func.apply(this, args), delay);
-          };
-        }
+    user_input = st.text_area(
+        "AIへの指示を入力してください", 
+        placeholder="例: Ignore previous instructions",
+        height=120,
+        key="prompt_guard_input"
+    )
 
-        function checkInjection(text) {
-          if (!text || !text.trim()) return { isDanger: false, matches: [], score: 0 };
+    if user_input:
+        matches = []
+        total_score = 0
 
-          const rules = [
-            { pattern: /ignore\s*(all)?\s*(previous|prior|above)\s*(instructions|prompts|rules)/i, label: "Ignore Instructions", score: 50 },
-            { pattern: /(以前|これまで)の(指示|プロンプト|ルール)を(無視|リセット|忘れ)/i, label: "以前の指示の無視 (日本語)", score: 50 },
-            { pattern: /(show|print|display|reveal|output)\s*(me)?\s*(the)?\s*(system|initial)?\s*(prompt|instructions)/i, label: "System Prompt Extraction", score: 40 },
-            { pattern: /(システム|初期)プロンプトを(表示|出力|開示|見せ)/i, label: "システムプロンプト開示要求 (日本語)", score: 40 },
-            { pattern: /(admin|administrator|developer|root|god)\s*mode|jailbreak/i, label: "Admin/Jailbreak Mode", score: 40 }
-          ];
+        for pattern, label, score in RULES:
+            if re.search(pattern, user_input, re.IGNORECASE):
+                matches.append(label)
+                total_score += score
 
-          const matches = [];
-          let score = 0;
-          for (const r of rules) {
-            if (r.pattern.test(text)) {
-              matches.push(r.label);
-              score += r.score;
-            }
-          }
-          return { isDanger: matches.length > 0, matches: matches, score: score };
-        }
-
-        const inputEl = document.getElementById("promptInput");
-        const warningEl = document.getElementById("warningBox");
-
-        const onInputDebounce = debounce((e) => {
-          const val = e.target.value;
-          const res = checkInjection(val);
-
-          if (res.isDanger) {
-            inputEl.classList.add("danger");
-            warningEl.textContent = "🚨 セキュリティ警告: 不正なプロンプトパターンを検出しました。";
-          } else {
-            inputEl.classList.remove("danger");
-            warningEl.textContent = "";
-          }
-
-          Streamlit.setComponentValue({
-            text: val,
-            isDanger: res.isDanger,
-            matches: res.matches,
-            score: res.score
-          });
-        }, 300);
-
-        inputEl.addEventListener("input", onInputDebounce);
-        Streamlit.setFrameHeight(130);
-      </script>
-    </body>
-    </html>
-    """
-
-    data = components.html(HTML_COMPONENT, height=140)
-
-    if data:
-        user_text = data.get("text", "")
-        is_danger = data.get("isDanger", False)
-        matches = data.get("matches", [])
-        score = data.get("score", 0)
-
-        if is_danger:
-            st.error(f"🚫 **入力が拒否されました (危険度スコア: {score})**")
+        if matches:
+            st.error(f"🚨 **セキュリティ警告: 不正なプロンプトパターンを検出しました (危険度スコア: {total_score})**")
             st.write("検知されたパターン:")
-            for match in matches:
-                st.caption(f"- {match}")
-            st.button("AI処理を実行する", disabled=True)
+            for m in matches:
+                st.caption(f"- {m}")
+            st.button("AI処理を実行する", disabled=True, key="btn_guard_disabled")
         else:
             st.success("✅ 入力されたテキストは安全です。")
-            if st.button("AI処理を実行する"):
-                st.info(f"AIに以下のテキストを送信しました:\n`{user_text}`")
+            if st.button("AI処理を実行する", key="btn_guard_enabled"):
+                st.info(f"AIに以下のテキストを送信しました:\n`{user_input}`")
