@@ -13,32 +13,44 @@ AIによる無断学習、ボイスクローン、情報漏洩からクリエイ
 
 ## ✨ Features / 主な機能
 
-1. **🖼️ Image Protection & Signature (画像保護 & 署名)**
-   - Protects illustrations from AI scraping with multi-pattern noise (`Grid`, `Slash`, `Checker`).
-   - Inserts customizable signatures with automated font scaling.
-2. **🔍 Watermark Verification (透かし検証)**
-   - Extracts and visualizes difference noise to verify invisible watermarks.
-3. **🔒 Secure ZIP Packager (暗号化ZIP作成)**
-   - Packages files into encrypted ZIP archives using **AES-256**.
-4. **🎬 Anti-AI Video Protection (動画保護)**
-   - Applies frame-by-frame anti-learning noise to `.mp4` videos.
-5. **⚡ Security Audit (環境監査)**
-   - Scans and verifies file integrity using **SHA-256** cryptographic hashes.
-6. **📄 Document & Code Vault (文書・コード暗号化)**
-   - Encrypts and decrypts sensitive documents (Word, PDF, `.py`) using **Fernet (AES-256)**.
-7. **🎵 Audio Vault (19kHz Anti-AI 音声保護)**
-   - Embeds non-audible 19kHz signature noise to neutralize AI voice cloning tools.
+**🛡️ Prompt Guard (プロンプトインジェクション検知) *NEW!***
+  - Detects and blocks prompt injection and system prompt extraction attacks in real-time using pattern matching.
+  - パターンマッチングにより、指示無視やシステムプロンプト抽出などの不正な入力（プロンプトインジェクション）をリアルタイムに検知・ブロック。
+
+**🖼️ Image Protection & Signature (画像保護 & 署名)**
+  - Protects illustrations from AI scraping with multi-pattern noise (`Grid`, `Slash`, `Checker`).
+  - Inserts customizable signatures with automated font scaling.
+
+**🔍 Watermark Verification (透かし検証)**
+  - Extracts and visualizes difference noise to verify invisible watermarks.
+
+**🔒 Secure ZIP Packager (暗号化ZIP作成)**
+  - Packages files into encrypted ZIP archives using AES-256.
+
+**🎬 Anti-AI Video Protection (動画保護)**
+  - Applies frame-by-frame anti-learning noise to .mp4 videos.
+
+**⚡ Security Audit (環境監査)**
+  - Scans and verifies file integrity using SHA-256 cryptographic hashes.
+
+**📄 Document & Code Vault (文書・コード暗号化)**
+  - Encrypts and decrypts sensitive documents (Word, PDF, .py) using Fernet (AES-256).
+
+**🎵 Audio Vault (19kHz Anti-AI 音声保護)**
+  - Embeds non-audible 19kHz signature noise to neutralize AI voice cloning tools.
+
+**📁 Automatic File Organizer (自動ファイル整理)**
+  - Automatically categorizes and organizes uploaded files by file extension.
 
 ---
 
 ## 🛠️ Tech Stack / 使用技術
-UI Framework: Streamlit
 
-Image / Video Processing: Pillow, OpenCV (opencv-python-headless), NumPy
-
-Audio Processing: SciPy
-
-Security & Encryption: Cryptography (Fernet / PBKDF2HMAC), PyZipper
+- UI Framework: Streamlit
+- Security & Guard: Regex Pattern Matching (Prompt Injection Defense), Cryptography (Fernet / PBKDF2HMAC), PyZipper
+- Image / Video Processing: Pillow, OpenCV (opencv-python-headless), NumPy
+- Audio Processing: SciPy
+- Backend & Cloud: Supabase (Authentication/Database), Cloudflare R2 (Storage), Resend (Email API)
 
 ---
 
