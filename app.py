@@ -8,6 +8,7 @@ import zipfile
 import urllib.parse
 import numpy as np
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ImageDraw, ImageFont
 from scipy.io import wavfile
 import pyzipper
@@ -47,7 +48,6 @@ def verify_pro_key(user_key: str) -> bool:
         return False
 
 def send_feedback(category: str, content: str, email: str = "") -> bool:
-
     try:
         supabase = init_supabase()
         data = {
@@ -63,7 +63,7 @@ def send_feedback(category: str, content: str, email: str = "") -> bool:
             admin_email = st.secrets.get("ADMIN_EMAIL", "hisnameissky+a@gmail.com")
 
             resend.Emails.send({
-                "from": "onboarding@resend.dev",  # テスト時はこのまま固定
+                "from": "onboarding@resend.dev",
                 "to": admin_email,
                 "subject": f"💬【Feedback】{category}",
                 "html": f"""
@@ -108,7 +108,8 @@ I18N = {
             "📄 文書・コード保護", 
             "🎵 音声資産保護",
             "📁 自動ファイル整理",
-            "💬 フィードバック"
+            "💬 フィードバック",
+            "🛡️ プロンプトガード"
         ],
         "img_tab": {
             "header": "AI Protection & Signature Pro",
@@ -230,6 +231,10 @@ I18N = {
             "btn_submit": "✉️ フィードバックを送信",
             "success": "🎉 フィードバックをお送りいただきありがとうございます！今後の開発の参考にさせていただきます。",
             "warn_empty": "⚠️ メッセージ内容を入力してください。"
+        },
+        "guard_tab": {
+            "header": "🛡️ リアルタイム・プロンプトインジェクション検知",
+            "desc": "フロントエンド（JavaScript）でリアルタイムに安全性を検査・判定します。"
         }
     },
     "en": {
@@ -259,7 +264,8 @@ I18N = {
             "📄 Document/Code Vault", 
             "🎵 Audio Asset Vault",
             "📁 File Organizer",
-            "💬 Feedback"
+            "💬 Feedback",
+            "🛡️ Prompt Guard"
         ],
         "img_tab": {
             "header": "AI Protection & Signature Pro",
@@ -381,6 +387,10 @@ I18N = {
             "btn_submit": "✉️ Send Feedback",
             "success": "🎉 Thank you for your feedback! It helps us improve the service.",
             "warn_empty": "⚠️ Please enter your message."
+        },
+        "guard_tab": {
+            "header": "🛡️ Real-time Prompt Injection Detection",
+            "desc": "Performs real-time security analysis in the browser frontend."
         }
     }
 }
@@ -460,7 +470,7 @@ def get_fernet_key(password: str, salt: bytes) -> bytes:
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode('utf-8')))
 
-# タブ生成（9つのタブ）
+# タブ生成（10個のタブ）
 (
     tab_img, 
     tab_verify, 
@@ -470,7 +480,8 @@ def get_fernet_key(password: str, salt: bytes) -> bytes:
     tab_doc, 
     tab_audio, 
     tab_organizer,
-    tab_feedback
+    tab_feedback,
+    tab_guard
 ) = st.tabs(texts["tabs"])
 
 # ==================== 1. 画像保護タブ ====================
@@ -930,3 +941,122 @@ with tab_feedback:
                     st.success(fb_text["success"])
         else:
             st.warning(fb_text["warn_empty"])
+
+# ==================== 10. プロンプトガードタブ ====================
+with tab_guard:
+    g_text = texts["guard_tab"]
+    st.header(g_text["header"])
+    st.write(g_text["desc"])
+
+    HTML_COMPONENT = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.4.0/dist/streamlit-component-lib.js"></script>
+      <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        textarea {
+          width: 100%;
+          height: 90px;
+          box-sizing: border-box;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 6px;
+          font-size: 14px;
+        }
+        textarea.danger {
+          border: 2px solid #ff4b4b;
+          background-color: #ffebeb;
+        }
+        .warning-text {
+          color: #ff4b4b;
+          font-size: 12px;
+          margin-top: 4px;
+          font-weight: bold;
+        }
+      </style>
+    </head>
+    <body>
+      <textarea id="promptInput" placeholder="AIへの指示を入力してください（例: Ignore previous instructions）"></textarea>
+      <div id="warningBox" class="warning-text"></div>
+
+      <script>
+        function debounce(func, delay) {
+          let timeoutId;
+          return function (...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(this, args), delay);
+          };
+        }
+
+        function checkInjection(text) {
+          if (!text || !text.trim()) return { isDanger: false, matches: [], score: 0 };
+
+          const rules = [
+            { pattern: /ignore\s*(all)?\s*(previous|prior|above)\s*(instructions|prompts|rules)/i, label: "Ignore Instructions", score: 50 },
+            { pattern: /(以前|これまで)の(指示|プロンプト|ルール)を(無視|リセット|忘れ)/i, label: "以前の指示の無視 (日本語)", score: 50 },
+            { pattern: /(show|print|display|reveal|output)\s*(me)?\s*(the)?\s*(system|initial)?\s*(prompt|instructions)/i, label: "System Prompt Extraction", score: 40 },
+            { pattern: /(システム|初期)プロンプトを(表示|出力|開示|見せ)/i, label: "システムプロンプト開示要求 (日本語)", score: 40 },
+            { pattern: /(admin|administrator|developer|root|god)\s*mode|jailbreak/i, label: "Admin/Jailbreak Mode", score: 40 }
+          ];
+
+          const matches = [];
+          let score = 0;
+          for (const r of rules) {
+            if (r.pattern.test(text)) {
+              matches.push(r.label);
+              score += r.score;
+            }
+          }
+          return { isDanger: matches.length > 0, matches: matches, score: score };
+        }
+
+        const inputEl = document.getElementById("promptInput");
+        const warningEl = document.getElementById("warningBox");
+
+        const onInputDebounce = debounce((e) => {
+          const val = e.target.value;
+          const res = checkInjection(val);
+
+          if (res.isDanger) {
+            inputEl.classList.add("danger");
+            warningEl.textContent = "🚨 セキュリティ警告: 不正なプロンプトパターンを検出しました。";
+          } else {
+            inputEl.classList.remove("danger");
+            warningEl.textContent = "";
+          }
+
+          Streamlit.setComponentValue({
+            text: val,
+            isDanger: res.isDanger,
+            matches: res.matches,
+            score: res.score
+          });
+        }, 300);
+
+        inputEl.addEventListener("input", onInputDebounce);
+        Streamlit.setFrameHeight(130);
+      </script>
+    </body>
+    </html>
+    """
+
+    data = components.html(HTML_COMPONENT, height=140)
+
+    if data:
+        user_text = data.get("text", "")
+        is_danger = data.get("isDanger", False)
+        matches = data.get("matches", [])
+        score = data.get("score", 0)
+
+        if is_danger:
+            st.error(f"🚫 **入力が拒否されました (危険度スコア: {score})**")
+            st.write("検知されたパターン:")
+            for match in matches:
+                st.caption(f"- {match}")
+            st.button("AI処理を実行する", disabled=True)
+        else:
+            st.success("✅ 入力されたテキストは安全です。")
+            if st.button("AI処理を実行する"):
+                st.info(f"AIに以下のテキストを送信しました:\n`{user_text}`")
