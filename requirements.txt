@@ -1,10 +1,11 @@
 streamlit
+streamlit-component-lib
+pillow
 numpy
-Pillow
 scipy
 pyzipper
 opencv-python-headless
 cryptography
 boto3
-supabase
 resend
+supabase
