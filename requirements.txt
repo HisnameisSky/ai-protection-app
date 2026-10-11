@@ -1,6 +1,4 @@
 streamlit
-fastapi
-uvicorn
 pydantic
 PyMuPDF
 Pillow
