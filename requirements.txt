@@ -1,11 +1,9 @@
 streamlit
-pydantic
-PyMuPDF
-Pillow
+pillow
 numpy
 scipy
-opencv-python-headless
 pyzipper
+opencv-python-headless
 cryptography
 boto3
 resend
